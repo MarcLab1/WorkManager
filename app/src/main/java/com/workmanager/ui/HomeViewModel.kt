@@ -5,13 +5,10 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.workmanager.database.model.Thing
+import androidx.work.*
 import com.workmanager.database.dao.IThingDao
 import com.workmanager.database.model.Item
+import com.workmanager.database.model.Thing
 import com.workmanager.worker.MyDeleteAllThingsAndItemsWorker
 import com.workmanager.worker.MyInsertListItemsWorker
 import com.workmanager.worker.MyInsertThingWorker
@@ -21,6 +18,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(val app: Application, val thingDao: IThingDao) :
@@ -48,11 +46,17 @@ class HomeViewModel @Inject constructor(val app: Application, val thingDao: IThi
     }
 
     fun addThingPeriodically() {
+
+        //Make sure internet is working
+        val constraints: Constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
         //The minimum repeat interval that can be defined is 15 minutes (same as the JobScheduler API).
-        val workRequest =
-            PeriodicWorkRequestBuilder<MyInsertThingWorker>(15, TimeUnit.MINUTES).build()
+        val workRequest = PeriodicWorkRequestBuilder<MyInsertThingWorker>(
+            15, TimeUnit.MINUTES).setConstraints(constraints).build()
 
         WorkManager.getInstance(app).enqueue(workRequest)
+
     }
 
     fun deleteAllThingsAndItems() {
@@ -75,6 +79,7 @@ class HomeViewModel @Inject constructor(val app: Application, val thingDao: IThi
             ).then(OneTimeWorkRequest.from(MySlowlyInsertListThingsWorker::class.java)).enqueue()
         }
     }
+
     fun chainRequestsOnlyOneSlowly() {
         viewModelScope.launch {
             WorkManager.getInstance(app).beginWith(
